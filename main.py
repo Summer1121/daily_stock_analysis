@@ -40,20 +40,24 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple
 from feishu_doc import FeishuDocManager
+from sqlalchemy.orm import Session # 导入 Session
 
 from config import get_config, Config
 from storage import get_db, DatabaseManager
 from data_provider import DataFetcherManager
 from data_provider.akshare_fetcher import AkshareFetcher, RealtimeQuote, ChipDistribution
-from analyzer import GeminiAnalyzer, AnalysisResult, STOCK_NAME_MAP
 from notification import NotificationService, NotificationChannel, send_daily_report
 from search_service import SearchService, SearchResponse
 from enums import ReportType
 from stock_analyzer import StockTrendAnalyzer, TrendAnalysisResult
 from market_analyzer import MarketAnalyzer
 
-# 配置日志格式
-LOG_FORMAT = '%(asctime)s | %(levelname)-8s | %(name)-20s | %(message)s'
+# 导入 TradingEngine 和 LLMOrchestrator
+from trading.engine import TradingEngine
+from analysis.orchestrator import LLMOrchestrator
+from analysis.agents.decision import AnalysisResult # 直接从 decision 导入
+from analysis.utils import STOCK_NAME_MAP # 导入 STOCK_NAME_MAP
+
 LOG_DATE_FORMAT = '%Y-%m-%d %H:%M:%S'
 
 
@@ -152,20 +156,15 @@ class StockAnalysisPipeline:
         self.fetcher_manager = DataFetcherManager()
         self.akshare_fetcher = AkshareFetcher()  # 用于获取增强数据（量比、筹码等）
         self.trend_analyzer = StockTrendAnalyzer()  # 趋势分析器
-        self.analyzer = GeminiAnalyzer()
         self.notifier = NotificationService()
         
-        # 初始化搜索服务
-        self.search_service = SearchService(
-            bocha_keys=self.config.bocha_api_keys,
-            tavily_keys=self.config.tavily_api_keys,
-            serpapi_keys=self.config.serpapi_keys,
-        )
+        # 初始化 LLM 协调器
+        self.orchestrator = LLMOrchestrator(config=self.config)
         
         logger.info(f"调度器初始化完成，最大并发数: {self.max_workers}")
         logger.info("已启用趋势分析器 (MA5>MA10>MA20 多头判断)")
-        if self.search_service.is_available:
-            logger.info("搜索服务已启用 (Tavily/SerpAPI)")
+        if self.orchestrator.search_service.is_available:
+            logger.info("搜索服务已启用 (通过 LLMOrchestrator)")
         else:
             logger.warning("搜索服务未启用（未配置 API Key）")
     
@@ -280,37 +279,16 @@ class StockAnalysisPipeline:
             except Exception as e:
                 logger.warning(f"[{code}] 趋势分析失败: {e}")
             
-            # Step 4: 多维度情报搜索（最新消息+风险排查+业绩预期）
-            news_context = None
-            if self.search_service.is_available:
-                logger.info(f"[{code}] 开始多维度情报搜索...")
-                
-                # 使用多维度搜索（最多3次搜索）
-                intel_results = self.search_service.search_comprehensive_intel(
-                    stock_code=code,
-                    stock_name=stock_name,
-                    max_searches=3
-                )
-                
-                # 格式化情报报告
-                if intel_results:
-                    news_context = self.search_service.format_intel_report(intel_results, stock_name)
-                    total_results = sum(
-                        len(r.results) for r in intel_results.values() if r.success
-                    )
-                    logger.info(f"[{code}] 情报搜索完成: 共 {total_results} 条结果")
-                    logger.debug(f"[{code}] 情报搜索结果:\n{news_context}")
-            else:
-                logger.info(f"[{code}] 搜索服务不可用，跳过情报搜索")
-            
-            # Step 5: 获取分析上下文（技术面数据）
-            context = self.db.get_analysis_context(code)
+            # Step 4: 获取分析上下文（技术面数据）
+            # 注意: context 在上一步趋势分析中已获取
+            if context is None:
+                context = self.db.get_analysis_context(code)
             
             if context is None:
                 logger.warning(f"[{code}] 无法获取分析上下文，跳过分析")
                 return None
             
-            # Step 6: 增强上下文数据（添加实时行情、筹码、趋势分析结果、股票名称）
+            # Step 5: 增强上下文数据（添加实时行情、筹码、趋势分析结果、股票名称）
             enhanced_context = self._enhance_context(
                 context, 
                 realtime_quote, 
@@ -319,8 +297,8 @@ class StockAnalysisPipeline:
                 stock_name  # 传入股票名称
             )
             
-            # Step 7: 调用 AI 分析（传入增强的上下文和新闻）
-            result = self.analyzer.analyze(enhanced_context, news_context=news_context)
+            # Step 6: 调用 LLMOrchestrator 进行综合分析
+            result = self.orchestrator.analyze(enhanced_context, stock_name)
             
             return result
             
@@ -472,6 +450,39 @@ class StockAnalysisPipeline:
                     f"[{code}] 分析完成: {result.operation_advice}, "
                     f"评分 {result.sentiment_score}"
                 )
+                
+                # ==== 交易引擎集成 ====
+                # 获取当前价格
+                current_price = 0.0
+                if 'realtime' in result.context and 'price' in result.context['realtime']:
+                    current_price = result.context['realtime']['price']
+                elif 'today' in result.context and 'close' in result.context['today']:
+                    current_price = result.context['today']['close']
+                
+                if current_price > 0:
+                    with self.db.get_session() as session: # 获取数据库会话
+                        # 根据配置的 trading_mode 决定 session_id
+                        if self.config.trading_mode == 'paper':
+                            session_id = "live_paper_session" # 固定的模拟会话ID
+                        elif self.config.trading_mode == 'live':
+                            session_id = "live_real_session" # 固定的实盘会话ID
+                        else: # 回测模式
+                            # 回测模式的 session_id 将由 Backtester 传递
+                            # 在此处，如果是单次运行，则默认到 paper 模式
+                            session_id = "live_paper_session"
+                            logger.warning(f"检测到非回测模式下 trading_mode 为 {self.config.trading_mode}，默认使用 'live_paper_session'。")
+
+                        trading_engine = TradingEngine(
+                            db_session=session, 
+                            config=self.config,
+                            session_id=session_id
+                        )
+                        order_id = trading_engine.process_analysis(code, result, current_price)
+                        if order_id:
+                            logger.info(f"[{code}] 交易决策已执行，订单ID: {order_id}")
+                else:
+                    logger.warning(f"[{code}] 未获取到有效当前价格，跳过交易决策。")
+                # ==== 交易引擎集成结束 ====
                 
                 # 单股推送模式（#55）：每分析完一只股票立即推送
                 if single_stock_notify and self.notifier.is_available():

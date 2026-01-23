@@ -39,6 +39,7 @@ from sqlalchemy.orm import (
 from sqlalchemy.exc import IntegrityError
 
 from config import get_config
+from trading.models import Order, Position, Trade # 新增导入
 
 logger = logging.getLogger(__name__)
 

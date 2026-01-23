@@ -171,6 +171,24 @@
 | `SCHEDULE_TIME` | 定时执行时间 | `18:00` |
 | `LOG_DIR` | 日志目录 | `./logs` |
 
+### 交易与回测配置
+
+| 变量名 | 说明 | 默认值 | 必填 |
+|--------|------|--------|:----:|
+| `TRADING_MODE` | 交易模式 (`paper`: 模拟盘, `live`: 实盘) | `paper` | 否 |
+| `TRADING_BROKER` | 使用的经纪商适配器名称 (`paper` 或真实券商名称) | `paper` | 否 |
+| `TRADING_CAPITAL` | 交易账户初始资金 (仅对模拟盘有效) | `100000.0` | 否 |
+| `TRADING_MAX_POSITION_PER_STOCK` | 单只股票的最大持仓金额 | `20000.0` | 否 |
+
+### LLM Agent 配置 (双层模型架构)
+
+| 变量名 | 说明 | 默认值 | 必填 |
+|--------|------|--------|:----:|
+| `SUMMARIZER_MODEL_NAME` | 摘要 Agent 使用的模型名称 | `gemini-3-flash-preview` | 否 |
+| `SUMMARIZER_MODEL_TYPE` | 摘要 Agent 的模型类型 (`gemini`, `openai`, `ollama`) | `gemini` | 否 |
+| `SUMMARIZER_API_KEY` | 摘要 Agent 的 API Key (如果与主模型不同) | - | 可选 |
+| `SUMMARIZER_BASE_URL` | 摘要 Agent 的 API Base URL (如果与主模型不同) | - | 可选 |
+
 ---
 
 ## Docker 部署

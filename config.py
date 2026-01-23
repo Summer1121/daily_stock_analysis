@@ -108,19 +108,18 @@ class Config:
     schedule_time: str = "18:00"              # 每日推送时间（HH:MM 格式）
     market_review_enabled: bool = True        # 是否启用大盘复盘
     
-    # === 流控配置（防封禁关键参数）===
-    # Akshare 请求间隔范围（秒）
-    akshare_sleep_min: float = 2.0
-    akshare_sleep_max: float = 5.0
-    
-    # Tushare 每分钟最大请求数（免费配额）
-    tushare_rate_limit_per_minute: int = 80
-    
-    # 重试配置
-    max_retries: int = 3
-    retry_base_delay: float = 1.0
-    retry_max_delay: float = 30.0
-    
+    # === 交易与回测配置 ===
+    trading_mode: str = "paper"               # 交易模式: paper (模拟), live (实盘)
+    trading_broker: str = "paper"             # 使用的经纪商适配器名称
+    trading_capital: float = 100000.0         # 交易账户初始资金 (模拟或实盘)
+    trading_max_position_per_stock: float = 20000.0 # 单只股票的最大持仓金额
+
+    # === LLM Agent 配置 ===
+    summarizer_model_name: str = "gemini-3-flash-preview" # 摘要 Agent 使用的模型
+    summarizer_model_type: str = "gemini"     # 摘要 Agent 的模型类型 (gemini, openai, ollama)
+    summarizer_api_key: Optional[str] = None  # 摘要 Agent 的 API Key (如果与主模型不同)
+    summarizer_base_url: Optional[str] = None # 摘要 Agent 的 API Base URL (如果与主模型不同)
+
     # === WebUI 配置 ===
     webui_enabled: bool = False
     webui_host: str = "127.0.0.1"
@@ -222,6 +221,18 @@ class Config:
             webui_enabled=os.getenv('WEBUI_ENABLED', 'false').lower() == 'true',
             webui_host=os.getenv('WEBUI_HOST', '127.0.0.1'),
             webui_port=int(os.getenv('WEBUI_PORT', '8000')),
+            
+            # === 交易与回测配置 ===
+            trading_mode=os.getenv('TRADING_MODE', 'paper'),
+            trading_broker=os.getenv('TRADING_BROKER', 'paper'),
+            trading_capital=float(os.getenv('TRADING_CAPITAL', '100000.0')),
+            trading_max_position_per_stock=float(os.getenv('TRADING_MAX_POSITION_PER_STOCK', '20000.0')),
+
+            # === LLM Agent 配置 ===
+            summarizer_model_name=os.getenv('SUMMARIZER_MODEL_NAME', 'gemini-3-flash-preview'),
+            summarizer_model_type=os.getenv('SUMMARIZER_MODEL_TYPE', 'gemini'),
+            summarizer_api_key=os.getenv('SUMMARIZER_API_KEY'),
+            summarizer_base_url=os.getenv('SUMMARIZER_BASE_URL'),
         )
     
     @classmethod
