@@ -116,7 +116,7 @@ class Trade(Base):
             'created_at': self.created_at.isoformat() if self.created_at else None,
         }
 
-    @dataclass
+@dataclass
 class AccountBalance:
     """
     账户资金余额模型

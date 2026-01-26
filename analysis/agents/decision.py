@@ -728,21 +728,14 @@ class DecisionAgent:
 
 请输出完整的 JSON 格式决策仪表盘。"""
         
-                return prompt
-        
-            
-        
-            def _parse_response(
-        
-                self, 
-        
-                response_text: str, 
-        
-                code: str, 
-        
-                name: str
-        
-            ) -> AnalysisResult:
+        return prompt
+
+    def _parse_response(
+        self, 
+        response_text: str, 
+        code: str, 
+        name: str
+    ) -> AnalysisResult:
         """
         解析大模型响应（决策仪表盘版）
         

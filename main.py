@@ -39,7 +39,6 @@ from datetime import datetime, date, timezone, timedelta
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple
-from feishu_doc import FeishuDocManager
 from sqlalchemy.orm import Session # 导入 Session
 
 from config import get_config, Config
@@ -446,6 +445,7 @@ class StockAnalysisPipeline:
             result = self.analyze_stock(code)
             
             if result:
+                self.db.save_analysis_record(result)
                 logger.info(
                     f"[{code}] 分析完成: {result.operation_advice}, "
                     f"评分 {result.sentiment_score}"
@@ -865,6 +865,7 @@ def run_full_analysis(
 
         # === 新增：生成飞书云文档 ===
         try:
+            from feishu_doc import FeishuDocManager
             feishu_doc = FeishuDocManager()
             if feishu_doc.is_configured() and (results or market_report):
                 logger.info("正在创建飞书云文档...")
@@ -937,24 +938,20 @@ def main() -> int:
     start_webui = (args.webui or args.webui_only or config.webui_enabled) and os.getenv("GITHUB_ACTIONS") != "true"
     
     if start_webui:
-        try:
-            from webui import run_server_in_thread
-            run_server_in_thread(host=config.webui_host, port=config.webui_port)
-        except Exception as e:
-            logger.error(f"启动 WebUI 失败: {e}")
-    
-    # === 仅 WebUI 模式：不自动执行分析 ===
-    if args.webui_only:
-        logger.info("模式: 仅 WebUI 服务")
-        logger.info(f"WebUI 运行中: http://{config.webui_host}:{config.webui_port}")
-        logger.info("通过 /analysis?code=xxx 接口手动触发分析")
-        logger.info("按 Ctrl+C 退出...")
-        try:
-            while True:
-                time.sleep(1)
-        except KeyboardInterrupt:
-            logger.info("\n用户中断，程序退出")
-        return 0
+        import uvicorn
+        from web.main import app
+
+        if args.webui_only:
+            logger.info("模式: 仅 WebUI 服务")
+            uvicorn.run(app, host=config.webui_host, port=config.webui_port)
+            return 0
+        else:
+            # 在后台线程中运行 uvicorn
+            import threading
+            server_thread = threading.Thread(target=uvicorn.run, args=(app,), kwargs={"host": config.webui_host, "port": config.webui_port})
+            server_thread.daemon = True
+            server_thread.start()
+            logger.info(f"WebUI 在后台运行: http://{config.webui_host}:{config.webui_port}")
 
     try:
         # 模式1: 仅大盘复盘
@@ -997,12 +994,13 @@ def main() -> int:
             return 0
         
         # 模式3: 正常单次运行
-        run_full_analysis(config, args, stock_codes)
+        if not args.webui_only:
+            run_full_analysis(config, args, stock_codes)
         
         logger.info("\n程序执行完成")
         
         # 如果启用了 WebUI 且是非定时任务模式，保持程序运行以便访问 WebUI
-        if start_webui and not (args.schedule or config.schedule_enabled):
+        if start_webui and not (args.schedule or config.schedule_enabled or args.webui_only):
             logger.info("WebUI 运行中 (按 Ctrl+C 退出)...")
             try:
                 # 简单的保持活跃循环
@@ -1020,7 +1018,6 @@ def main() -> int:
     except Exception as e:
         logger.exception(f"程序执行失败: {e}")
         return 1
-
 
 if __name__ == "__main__":
     sys.exit(main())

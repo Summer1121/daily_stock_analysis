@@ -17,6 +17,7 @@ from typing import List, Dict, Any, Optional
 from pathlib import Path # 导入 Path
 
 import pandas as pd
+import numpy as np
 from sqlalchemy.orm import Session
 
 from config import get_config, Config
@@ -73,10 +74,11 @@ class Backtester:
         
         return all_history_data
 
-    def run(self, 
-            stock_codes: List[str], 
-            start_date: date, 
-            end_date: date
+    def run(self,
+            stock_codes: List[str],
+            start_date: date,
+            end_date: date,
+            strategy_name: str = "FollowLLMStrategy"
             ) -> Dict[str, Any]:
         """
         运行回测。
@@ -85,12 +87,13 @@ class Backtester:
             stock_codes (List[str]): 要回测的股票代码列表。
             start_date (date): 回测开始日期。
             end_date (date): 回测结束日期。
+            strategy_name (str): 要使用的策略名称。
 
         Returns:
             Dict[str, Any]: 包含绩效报告的字典。
         """
         session_id = f"backtest_{uuid.uuid4().hex[:8]}"
-        logger.info(f"开始回测，会话ID: {session_id}，时间范围: {start_date} 到 {end_date}")
+        logger.info(f"开始回测，会话ID: {session_id}，策略: {strategy_name}，时间范围: {start_date} 到 {end_date}")
 
         # 使用新方法加载数据
         all_history_data = self._load_historical_data(stock_codes, start_date, end_date)
@@ -98,62 +101,63 @@ class Backtester:
         if not all_history_data:
             logger.warning("未加载到任何历史数据，无法进行回测。")
             return {}
-        
-                daily_assets = []
-                current_date = start_date
-                
-                with self.db.get_session() as session:
-                    # 在循环外初始化一次 TradingEngine
-                    trading_engine = TradingEngine(
-                        db_session=session, 
-                        config=self.config,
-                        session_id=session_id
-                    )
-                    orchestrator = LLMOrchestrator(config=self.config)
-        
-                    while current_date <= end_date:
-                        logger.debug(f"--- 回测日期: {current_date} ---")
-                        
-                        # 更新所有持仓的市价
-                        positions = trading_engine.broker.list_positions()
-                        for pos in positions:
-                            if pos.stock_code in all_history_data and current_date in all_history_data[pos.stock_code].index:
-                                current_price = all_history_data[pos.stock_code].loc[current_date]['close']
-                                trading_engine.broker._update_position_current_price(pos.stock_code, current_price)
-        
-                        # 交易决策
-                        for code in stock_codes:
-                            if code not in all_history_data or current_date not in all_history_data[code].index:
-                                continue
-        
-                            context = self.db.get_analysis_context(code, target_date=current_date)
-                            if not context:
-                                continue
-                            
-                            current_price = all_history_data[code].loc[current_date]['close']
-                            stock_name = all_history_data[code].loc[current_date].get('name', f"股票{code}")
-                            
-                            # 运行分析 (在回测中，我们可能跳过新闻搜索以加速，仅依赖技术指标)
-                            analysis_result = orchestrator.analyze(context, stock_name)
-                            
-                            # 执行交易
-                            if analysis_result and analysis_result.success:
-                                trading_engine.process_analysis(
-                                    stock_code=code,
-                                    analysis_result=analysis_result,
-                                    current_price=current_price,
-                                    trade_time=datetime.combine(current_date, datetime.min.time())
-                                )
-                        
-                        # 记录每日总资产
-                        balance = trading_engine.broker.get_account_balance()
-                        daily_assets.append(balance.total_assets)
-                        
-                        current_date += timedelta(days=1)
-                
-                # 生成报告
-                report = self.generate_report(session_id, start_date, end_date, daily_assets)
-                return report
+
+        daily_assets = []
+        current_date = start_date
+
+        with self.db.get_session() as session:
+            # 在循环外初始化一次 TradingEngine
+            trading_engine = TradingEngine(
+                db_session=session,
+                config=self.config,
+                session_id=session_id,
+                strategy_name=strategy_name
+            )
+            orchestrator = LLMOrchestrator(config=self.config)
+
+            while current_date <= end_date:
+                logger.debug(f"--- 回测日期: {current_date} ---")
+
+                # 更新所有持仓的市价
+                positions = trading_engine.broker.list_positions()
+                for pos in positions:
+                    if pos.stock_code in all_history_data and current_date in all_history_data[pos.stock_code].index:
+                        current_price = all_history_data[pos.stock_code].loc[current_date]['close']
+                        trading_engine.broker._update_position_current_price(pos.stock_code, current_price)
+
+                # 交易决策
+                for code in stock_codes:
+                    if code not in all_history_data or current_date not in all_history_data[code].index:
+                        continue
+
+                    context = self.db.get_analysis_context(code, target_date=current_date)
+                    if not context:
+                        continue
+
+                    current_price = all_history_data[code].loc[current_date]['close']
+                    stock_name = all_history_data[code].loc[current_date].get('name', f"股票{code}")
+
+                    # 运行分析 (在回测中，我们可能跳过新闻搜索以加速，仅依赖技术指标)
+                    analysis_result = orchestrator.analyze(context, stock_name)
+
+                    # 执行交易
+                    if analysis_result and analysis_result.success:
+                        trading_engine.process_analysis(
+                            stock_code=code,
+                            analysis_result=analysis_result,
+                            current_price=current_price,
+                            trade_time=datetime.combine(current_date, datetime.min.time())
+                        )
+
+                # 记录每日总资产
+                balance = trading_engine.broker.get_account_balance()
+                daily_assets.append(balance.total_assets)
+
+                current_date += timedelta(days=1)
+
+        # 生成报告
+        report = self.generate_report(session_id, start_date, end_date, daily_assets)
+        return report
     def generate_report(self, session_id: str, start_date: date, end_date: date, daily_assets: List[float]) -> Dict[str, Any]:
         """
         生成回测绩效报告。

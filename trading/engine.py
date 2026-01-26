@@ -1,5 +1,6 @@
 import logging
 from typing import Dict, Any, Optional
+from datetime import datetime
 
 from sqlalchemy.orm import Session
 
@@ -7,7 +8,7 @@ from config import Config, get_config
 from storage import DatabaseManager
 from trading.brokers.base import AbstractBroker
 from trading.brokers.paper_broker import PaperBroker # 暂时只使用 PaperBroker
-from trading.strategy import TradingStrategy
+from trading.strategy import BaseStrategy, strategy_registry
 from trading.models import Position # 用于类型提示
 
 logger = logging.getLogger(__name__)
@@ -23,7 +24,8 @@ class TradingEngine:
     def __init__(self, 
                  db_session: Session, 
                  config: Optional[Config] = None,
-                 session_id: str = "default_paper_session"
+                 session_id: str = "default_paper_session",
+                 strategy_name: str = "FollowLLMStrategy"
                  ):
         """
         初始化交易引擎。
@@ -32,14 +34,19 @@ class TradingEngine:
             db_session (Session): SQLAlchemy 数据库会话。
             config (Optional[Config]): 配置实例，如果未提供则从全局获取。
             session_id (str): 模拟或回测会话ID，用于隔离数据。
+            strategy_name (str): 要使用的策略名称。
         """
         self.db_session = db_session
         self.config = config if config else get_config()
         self.session_id = session_id
         
-        self.strategy = TradingStrategy(self.config)
+        strategy_class = strategy_registry.get(strategy_name)
+        if not strategy_class:
+            raise ValueError(f"未找到名为 '{strategy_name}' 的策略")
+        self.strategy: BaseStrategy = strategy_class(config=self.config)
+        
         self.broker: AbstractBroker = self._initialize_broker()
-        logger.info(f"交易引擎初始化完成，模式: {self.config.trading_mode}，经纪商: {self.config.trading_broker}，会话ID: {self.session_id}")
+        logger.info(f"交易引擎初始化完成，策略: {self.strategy.name}, 模式: {self.config.trading_mode}，经纪商: {self.config.trading_broker}，会话ID: {self.session_id}")
 
     def _initialize_broker(self) -> AbstractBroker:
         """
@@ -127,3 +134,16 @@ class TradingEngine:
             "account_balance": account_balance.to_dict(),
             "positions": [p.to_dict() for p in positions]
         }
+
+    def place_manual_order(self, stock_code: str, direction: str, quantity: int, order_type: str, price: Optional[float] = None) -> Optional[str]:
+        """
+        Manually place an order.
+        """
+        try:
+            order = self.broker.place_order(stock_code, direction.upper(), quantity, order_type.upper(), price)
+            self.db_session.commit()
+            return order.order_id
+        except Exception as e:
+            self.db_session.rollback()
+            logger.error(f"手动下单失败: {e}")
+            return None

@@ -22,6 +22,8 @@ class FeishuDocManager:
         # 初始化 SDK 客户端
         # SDK 会自动处理 tenant_access_token 的获取和刷新，无需人工干预
         if self.is_configured():
+            import lark_oapi as lark
+            from lark_oapi.api.docx.v1 import *
             self.client = lark.Client.builder() \
                 .app_id(self.app_id) \
                 .app_secret(self.app_secret) \
@@ -43,6 +45,8 @@ class FeishuDocManager:
             return None
 
         try:
+            from lark_oapi.api.docx.v1 import CreateDocumentRequest, CreateDocumentRequestBody, \
+                CreateDocumentBlockChildrenRequest, CreateDocumentBlockChildrenRequestBody
             # 1. 创建文档
             # 使用官方 SDK 的 Builder 模式构造请求
             create_request = CreateDocumentRequest.builder() \
@@ -102,6 +106,7 @@ class FeishuDocManager:
         """
         将简单的 Markdown 转换为飞书 SDK 的 Block 对象
         """
+        from lark_oapi.api.docx.v1 import Block, Divider, Text, TextRun, TextElement, TextStyle, TextElementStyle
         blocks = []
         lines = md_text.split('\n')
 

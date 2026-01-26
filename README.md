@@ -152,35 +152,40 @@
 
 > 📖 完整环境变量、定时任务配置请参考 [完整配置指南](docs/full-guide.md)
 
-## 🖥️ 本地 WebUI（可选）
+## 🖥️ 本地控制台 (WebUI)
 
-本地运行时，可启用 WebUI 来管理配置和触发分析。
+项目提供一个功能强大的本地控制台，用于监控和控制系统的所有核心功能。
 
 ### 启动方式
 
 | 命令 | 说明 |
 |------|------|
-| `python main.py --webui` | 启动 WebUI + 执行一次完整分析 |
-| `python main.py --webui-only` | 仅启动 WebUI，手动触发分析 |
+| `python main.py --webui-only` | 仅启动 WebUI 服务 |
 
 - 访问地址：`http://127.0.0.1:8000`
-- 详细说明请参考 [配置指南 - WebUI](docs/full-guide.md#本地-webui-管理界面)
 
 ### 功能特性
 
-- 📝 **配置管理** - 查看/修改 `.env` 里的自选股列表
-- 🚀 **快速分析** - 页面输入股票代码，一键触发分析
-- 📊 **实时进度** - 分析任务状态实时更新，支持多任务并行
+- 📊 **交易看板** - 查看持仓、盈利、汇总等
+- 📈 **策略管理** - 启用/禁用/切换交易策略
+- 📰 **实时新闻** - 查看实时新闻流
+- 📜 **分析记录** - 查看历史走势分析记录
+- ⚙️ **系统配置** - 管理信息渠道、推送等配置
+- 🕹️ **手动交易** - 手动执行买卖操作
+- ⏪ **策略回测** - 在历史数据上评估策略表现
 
 ### API 接口
 
 | 接口 | 方法 | 说明 |
 |------|------|------|
-| `/` | GET | 配置管理页面 |
-| `/health` | GET | 健康检查 |
-| `/analysis?code=xxx` | GET | 触发单只股票异步分析 |
-| `/tasks` | GET | 查询所有任务状态 |
-| `/task?id=xxx` | GET | 查询单个任务状态 |
+| `/api/config` | GET, POST | 获取和更新系统配置 |
+| `/api/news/ws` | WebSocket | 实时新闻推送 |
+| `/api/news/{stock_code}` | GET | 获取单只股票新闻 |
+| `/api/analysis/{stock_code}` | GET | 获取单只股票历史分析记录 |
+| `/api/trading/dashboard` | GET | 获取交易看板数据 |
+| `/api/trading/strategies` | GET, POST | 获取和管理策略 |
+| `/api/trading/order` | POST | 手动下单 |
+| `/api/trading/backtest` | POST | 运行回测 |
 
 ## 📁 项目结构
 

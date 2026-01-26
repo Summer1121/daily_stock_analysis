@@ -39,7 +39,6 @@ from sqlalchemy.orm import (
 from sqlalchemy.exc import IntegrityError
 
 from config import get_config
-from trading.models import Order, Position, Trade # 新增导入
 
 logger = logging.getLogger(__name__)
 
@@ -118,6 +117,52 @@ class StockDaily(Base):
             'volume_ratio': self.volume_ratio,
             'data_source': self.data_source,
         }
+
+
+class AnalysisRecord(Base):
+    """
+    AI 分析结果记录模型
+    """
+    __tablename__ = 'analysis_record'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    code = Column(String(10), nullable=False, index=True)
+    date = Column(Date, nullable=False, index=True)
+    name = Column(String(50))
+    sentiment_score = Column(Integer)
+    trend_prediction = Column(String(50))
+    operation_advice = Column(String(50))
+    confidence_level = Column(String(10))
+    trend_analysis = Column(String)
+    short_term_outlook = Column(String)
+    medium_term_outlook = Column(String)
+    technical_analysis = Column(String)
+    ma_analysis = Column(String)
+    volume_analysis = Column(String)
+    pattern_analysis = Column(String)
+    fundamental_analysis = Column(String)
+    sector_position = Column(String)
+    company_highlights = Column(String)
+    news_summary = Column(String)
+    market_sentiment = Column(String)
+    hot_topics = Column(String)
+    analysis_summary = Column(String)
+    key_points = Column(String)
+    risk_warning = Column(String)
+    buy_reason = Column(String)
+    raw_response = Column(String)
+    search_performed = Column(String)
+    data_sources = Column(String)
+    created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+
+    __table_args__ = (
+        UniqueConstraint('code', 'date', name='uix_analysis_code_date'),
+    )
+
+    def to_dict(self) -> Dict[str, Any]:
+        """转换为字典"""
+        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
 
 class DatabaseManager:
@@ -384,6 +429,68 @@ class DatabaseManager:
                 raise
         
         return saved_count
+    
+    def save_analysis_record(self, result: "AnalysisResult") -> None:
+        """
+        Save analysis result to the database.
+        """
+        if not result or not result.success:
+            return
+
+        with self.get_session() as session:
+            try:
+                today = date.today()
+                record = AnalysisRecord(
+                    code=result.code,
+                    date=today,
+                    name=result.name,
+                    sentiment_score=result.sentiment_score,
+                    trend_prediction=result.trend_prediction,
+                    operation_advice=result.operation_advice,
+                    confidence_level=result.confidence_level,
+                    trend_analysis=result.trend_analysis,
+                    short_term_outlook=result.short_term_outlook,
+                    medium_term_outlook=result.medium_term_outlook,
+                    technical_analysis=result.technical_analysis,
+                    ma_analysis=result.ma_analysis,
+                    volume_analysis=result.volume_analysis,
+                    pattern_analysis=result.pattern_analysis,
+                    fundamental_analysis=result.fundamental_analysis,
+                    sector_position=result.sector_position,
+                    company_highlights=result.company_highlights,
+                    news_summary=result.news_summary,
+                    market_sentiment=result.market_sentiment,
+                    hot_topics=result.hot_topics,
+                    analysis_summary=result.analysis_summary,
+                    key_points=result.key_points,
+                    risk_warning=result.risk_warning,
+                    buy_reason=result.buy_reason,
+                    raw_response=result.raw_response,
+                    search_performed=str(result.search_performed),
+                    data_sources=result.data_sources,
+                )
+                session.add(record)
+                session.commit()
+                logger.info(f"[{result.code}] 分析结果已保存到数据库")
+            except IntegrityError:
+                session.rollback()
+                logger.warning(f"[{result.code}] 今日分析结果已存在，跳过保存")
+            except Exception as e:
+                session.rollback()
+                logger.error(f"[{result.code}] 保存分析结果失败: {e}")
+    
+    def get_analysis_records(self, code: str, limit: int = 30) -> List[AnalysisRecord]:
+        """
+        Get historical analysis records for a stock.
+        """
+        with self.get_session() as session:
+            results = session.execute(
+                select(AnalysisRecord)
+                .where(AnalysisRecord.code == code)
+                .order_by(desc(AnalysisRecord.date))
+                .limit(limit)
+            ).scalars().all()
+            return list(results)
     
     def get_analysis_context(
         self, 

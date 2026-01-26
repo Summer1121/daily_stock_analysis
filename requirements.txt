@@ -37,3 +37,15 @@ httpx[socks]                # HTTP 客户端 + SOCKS 代理支持（OpenAI 可�
 
 # 数据库
 # SQLite 是 Python 内置，无需额外安装
+
+# Web 服务 (FastAPI)
+fastapi>=0.111.0            # 高性能 Web 框架
+uvicorn[standard]>=0.30.1    # ASGI 服务器
+python-multipart>=0.0.9     # 用于处理表单数据
+websockets>=12.0            # WebSocket 支持
+jinja2>=3.1.2               # 模板引擎
+
+# 测试依赖
+pytest>=8.2.2               # 测试框架
+httpx>=0.27.0               # HTTP 客户端，用于测试 FastAPI
+playwright>=1.44.0          # E2E 测试框架
