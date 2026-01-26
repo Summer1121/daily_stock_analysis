@@ -76,7 +76,10 @@
 
 > *注：至少配置一个渠道，配置多个则同时推送
 >
-> 📖 更多配置（Pushover 手机推送、飞书云文档等）请参考 [完整配置指南](docs/full-guide.md)
+> 📖 更多配置（Pushover 手机推送、飞书云文档等）请参考 [配置指南](docs/config-guide.md)
+> 📖 本地运行、Docker 部署详细步骤请参考 [本地部署指南](docs/deploy-local.md)
+> 📖 线上 GitHub Actions 部署请参考 [线上部署指南](docs/deploy-online.md)
+> 📖 完整环境变量、定时任务配置请参考 [配置指南](docs/config-guide.md)
 
 **其他配置**
 
