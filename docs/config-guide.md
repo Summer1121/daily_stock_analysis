@@ -33,8 +33,17 @@
 
 | 变量名 | 说明 | 默认值 |
 |--------|------|--------|
-| `TRADING_MODE` | 交易模式 (`paper`/`live`) | `paper` |
-| `TRADING_CAPITAL` | 初始资金 | `100000.0` |
+| `TRADING_MODE` | **交易模式**。可选值：`paper` (模拟盘), `live` (实盘)。实盘模式下需配置下方 `REAL_` 开头的变量。 | `paper` |
+| `TRADING_BROKER` | **经纪商概念类型**。当 `TRADING_MODE` 为 `live` 时有效。可选值：`real_api` (量化接口), `real_ui_automation` (UI自动化)。 | `paper` |
+| `TRADING_CAPITAL` | 初始资金。在**首次**运行模拟盘或每次**新的回测**时，系统会创建的初始虚拟资金。 | `100000.0` |
+| `TRADING_MAX_POSITION_PER_STOCK` | 单只股票最大持仓金额。风控参数，限制系统在单只股票上投入过多资金。 | `20000.0` |
+| `REAL_BROKER_TYPE` | **具体券商类型**。当 `TRADING_MODE` 为 `live` 时有效。例如：`tiger` (老虎证券), `ths_web` (同花顺网页版)。 | - |
+| `REAL_BROKER_API_KEY` | **实盘 API Key**。当 `TRADING_BROKER` 为 `real_api` 时需要。例如：老虎证券的 `Tiger ID`。 | - |
+| `REAL_BROKER_API_SECRET` | **实盘 API Secret**。当 `TRADING_BROKER` 为 `real_api` 时需要。例如：老虎证券的 RSA 私钥文件路径或私钥内容。 | - |
+| `REAL_BROKER_ACCOUNT` | **实盘交易账号**。当 `TRADING_BROKER` 为 `real_ui_automation` 时需要。 | - |
+| `REAL_BROKER_PASSWORD` | **实盘交易密码**。当 `TRADING_BROKER` 为 `real_ui_automation` 时需要。**敏感信息，建议加密存储或通过安全方式加载。** | - |
+| `UI_AUTOMATION_BROWSER` | **UI自动化浏览器类型**。当 `TRADING_BROKER` 为 `real_ui_automation` 时有效。可选值：`chrome`, `firefox`, `edge`。 | `chrome` |
+| `UI_AUTOMATION_HEADLESS` | **UI自动化无头模式**。当 `TRADING_BROKER` 为 `real_ui_automation` 时有效。可选值：`true` (无头模式), `false` (有头模式)。 | `true` |
 
 ## 通知渠道详细配置
 

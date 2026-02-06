@@ -13,7 +13,7 @@ cd daily_stock_analysis
 
 # 2. 配置环境变量
 cp .env.example .env
-vim .env  # 填入 API Key 和配置
+vim .env  # 填入 API Key 和配置。**实盘交易需要额外配置，详见 [配置指南](config-guide.md)。**
 
 # 3. 启动容器
 docker-compose up -d webui      # WebUI 模式（推荐）
@@ -35,6 +35,8 @@ docker-compose up -d analyzer   # 定时任务模式
 
 ```bash
 pip install -r requirements.txt
+# 如果使用 UI 自动化功能，需要安装 Playwright 浏览器驱动
+# playwright install
 ```
 
 ### 命令行参数

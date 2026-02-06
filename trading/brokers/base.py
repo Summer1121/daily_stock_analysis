@@ -100,3 +100,24 @@ class AbstractBroker(ABC):
             List[Trade]: 与该订单相关的所有成交记录。
         """
         pass
+
+    @abstractmethod
+    def connect(self, **kwargs) -> bool:
+        """
+        建立与交易经纪商的连接。
+        不同的经纪商可能需要不同的连接参数（如API密钥、会话令牌等）。
+
+        Returns:
+            bool: 如果连接成功则返回 True，否则返回 False。
+        """
+        pass
+
+    @abstractmethod
+    def disconnect(self) -> bool:
+        """
+        断开与交易经纪商的连接。
+
+        Returns:
+            bool: 如果断开成功则返回 True，否则返回 False。
+        """
+        pass
