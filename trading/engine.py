@@ -52,16 +52,70 @@ class TradingEngine:
         """
         根据配置初始化并返回相应的经纪商实例。
         """
-        broker_type = self.config.trading_broker
-        
-        if broker_type == 'paper':
-            # 在回测或模拟模式下，总是使用 PaperBroker
+        trading_mode = self.config.trading_mode
+        # trading_broker 现在表示经纪商的“概念”类型 (paper, real_api, real_ui_automation)
+        broker_concept_type = self.config.trading_broker
+        # real_broker_type 表示具体的真实经纪商 (例如 guosen, tiger, ths_web)
+        real_broker_type = self.config.real_broker_type
+
+        if trading_mode == 'paper':
             return PaperBroker(session=self.db_session, session_id=self.session_id)
-        elif self.config.trading_mode == 'live':
-            # TODO: 实现真实的经纪商适配器
-            raise NotImplementedError(f"真实经纪商 '{broker_type}' 尚未实现。")
+        elif trading_mode == 'live':
+            # 尝试连接经纪商
+            broker_instance = None
+            if broker_concept_type == 'real_api':
+                logger.info(f"尝试初始化真实 API 经纪商: {real_broker_type}...")
+                # TODO: 在此处导入并实例化具体的 RealApiBroker(s)
+                # 例如：from trading.brokers.guosen_api_broker import GuosenApiBroker
+                if real_broker_type == 'guosen':
+                    # broker_instance = GuosenApiBroker(config=self.config)
+                    raise NotImplementedError(f"真实 API 经纪商 '{real_broker_type}' 尚未实现。")
+                elif real_broker_type == 'tiger':
+                    # broker_instance = TigerApiBroker(config=self.config)
+                    raise NotImplementedError(f"真实 API 经纪商 '{real_broker_type}' 尚未实现。")
+                else:
+                    logger.error(f"不支持的真实 API 经纪商类型: '{real_broker_type}'")
+                    raise ValueError(f"不支持的真实 API 经纪商类型: '{real_broker_type}'")
+            elif broker_concept_type == 'real_ui_automation':
+                logger.info(f"尝试初始化真实 UI 自动化经纪商: {real_broker_type}...")
+                # TODO: 在此处导入并实例化具体的 UiAutomationBroker(s)
+                # 例如：from trading.brokers.ths_web_ui_broker import ThsWebUiAutomationBroker
+                if real_broker_type == 'ths_web':
+                    # broker_instance = ThsWebUiAutomationBroker(config=self.config)
+                    raise NotImplementedError(f"真实 UI 自动化经纪商 '{real_broker_type}' 尚未实现。")
+                else:
+                    logger.error(f"不支持的真实 UI 自动化经纪商类型: '{real_broker_type}'")
+                    raise ValueError(f"不支持的真实 UI 自动化经纪商类型: '{real_broker_type}'")
+            else:
+                logger.error(f"在实盘模式下，不支持的经纪商概念类型: '{broker_concept_type}'。请配置 'real_api' 或 'real_ui_automation'。")
+                raise ValueError(f"在实盘模式下，不支持的经纪商概念类型: '{broker_concept_type}'。请配置 'real_api' 或 'real_ui_automation'。")
+
+            # 建立连接
+            if broker_instance:
+                logger.info(f"正在连接真实经纪商: {real_broker_type}...")
+                try:
+                    if broker_instance.connect(
+                        api_key=self.config.real_broker_api_key,
+                        api_secret=self.config.real_broker_api_secret,
+                        account=self.config.real_broker_account,
+                        password=self.config.real_broker_password,
+                        browser_type=self.config.ui_automation_browser,
+                        headless=self.config.ui_automation_headless
+                    ):
+                        logger.info(f"成功连接真实经纪商: {real_broker_type}")
+                        return broker_instance
+                    else:
+                        logger.error(f"连接真实经纪商失败: {real_broker_type} - 连接方法返回 False。")
+                        raise ConnectionError(f"无法连接到真实经纪商: {real_broker_type}")
+                except Exception as e:
+                    logger.error(f"连接真实经纪商 '{real_broker_type}' 时发生异常: {e}", exc_info=True)
+                    raise ConnectionError(f"连接真实经纪商 '{real_broker_type}' 时发生异常: {e}") from e
+            else:
+                logger.error("经纪商实例未成功创建，无法进行连接。")
+                raise RuntimeError("经纪商实例未成功创建。")
         else:
-            raise ValueError(f"不支持的经纪商类型或交易模式: {broker_type} / {self.config.trading_mode}")
+            logger.error(f"不支持的交易模式: '{trading_mode}'。")
+            raise ValueError(f"不支持的交易模式: '{trading_mode}'。")
 
     def process_analysis(self, 
                          stock_code: str, 
@@ -102,6 +156,8 @@ class TradingEngine:
             if self.strategy.should_sell(stock_code, analysis_result, current_positions, account_balance, current_price):
                 sell_quantity = self.strategy.get_sell_quantity(stock_code, current_positions)
                 if sell_quantity > 0:
+                    # 注意：实盘交易中，place_order 可能不会立即返回最终状态，order_id 仅代表订单提交成功。
+                    # 实际订单状态和成交结果需要通过异步查询或回调机制更新。
                     order = self.broker.place_order(stock_code, 'SELL', sell_quantity, 'MARKET', current_price)
                     order_id = order.order_id
                     logger.info(f"交易引擎: {stock_code} 执行卖出 {sell_quantity} 股，订单ID: {order_id}")
@@ -110,11 +166,14 @@ class TradingEngine:
             elif self.strategy.should_buy(stock_code, analysis_result, current_positions, account_balance, current_price):
                 buy_quantity = self.strategy.get_buy_quantity(stock_code, current_price, account_balance)
                 if buy_quantity > 0:
+                    # 注意：实盘交易中，place_order 可能不会立即返回最终状态，order_id 仅代表订单提交成功。
+                    # 实际订单状态和成交结果需要通过异步查询或回调机制更新。
                     order = self.broker.place_order(stock_code, 'BUY', buy_quantity, 'MARKET', current_price)
                     order_id = order.order_id
                     logger.info(f"交易引擎: {stock_code} 执行买入 {buy_quantity} 股，订单ID: {order_id}")
             
-            # 提交会话更改
+            # TODO: 实盘模式下，这里的 commit 可能需要更精细的控制，
+            # 例如在收到订单成交回报后再更新数据库，而不是在提交订单后立即提交。
             self.db_session.commit()
 
         except Exception as e:
@@ -140,7 +199,11 @@ class TradingEngine:
         Manually place an order.
         """
         try:
+            # 注意：实盘交易中，place_order 可能不会立即返回最终状态，order_id 仅代表订单提交成功。
+            # 实际订单状态和成交结果需要通过异步查询或回调机制更新。
             order = self.broker.place_order(stock_code, direction.upper(), quantity, order_type.upper(), price)
+            # TODO: 实盘模式下，这里的 commit 可能需要更精细的控制，
+            # 例如在收到订单成交回报后再更新数据库，而不是在提交订单后立即提交。
             self.db_session.commit()
             return order.order_id
         except Exception as e:

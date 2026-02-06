@@ -39,6 +39,22 @@
 | `STOCK_LIST` | 自选股代码，如 `600519,300750` | ✅ |
 | `TAVILY_API_KEYS` | Tavily 搜索 API（推荐） | 推荐 |
 
+#### 实盘交易配置
+
+| Secret 名称 | 说明 | 必填 |
+|------------|------|:----:|
+| `TRADING_MODE` | **交易模式** (`paper`/`live`) | 否 |
+| `TRADING_BROKER` | **经纪商概念类型** (`real_api`/`real_ui_automation`) | 否 |
+| `TRADING_CAPITAL` | 初始资金 | 否 |
+| `TRADING_MAX_POSITION_PER_STOCK` | 单只股票最大持仓金额 | 否 |
+| `REAL_BROKER_TYPE` | **具体券商类型** (如 `tiger`, `ths_web`) | 否 |
+| `REAL_BROKER_API_KEY` | **实盘 API Key** (如老虎证券的 `Tiger ID`) | 否 |
+| `REAL_BROKER_API_SECRET` | **实盘 API Secret** (如老虎证券的 RSA 私钥文件路径或内容) | 否 |
+| `REAL_BROKER_ACCOUNT` | **实盘交易账号** (UI 自动化模式需要) | 否 |
+| `REAL_BROKER_PASSWORD` | **实盘交易密码** (UI 自动化模式需要)。**警告: 敏感信息，不建议直接存放于 GitHub Secrets。** | 否 |
+| `UI_AUTOMATION_BROWSER` | **UI自动化浏览器类型** (`chrome`, `firefox`, `edge`) | 否 |
+| `UI_AUTOMATION_HEADLESS` | **UI自动化无头模式** (`true`/`false`) | 否 |
+
 ### 3. 启用 Actions
 
 1. 点击顶部的 `Actions` 标签。

@@ -96,11 +96,15 @@ class Trade(Base):
     quantity = Column(Integer, nullable=False)
     price = Column(Float, nullable=False) # 成交价格
     amount = Column(Float, nullable=False) # 成交金额 = quantity * price
+    commission = Column(Float, nullable=False, default=0.0) # 佣金
+    stamp_duty = Column(Float, nullable=False, default=0.0) # 印花税
+    other_fees = Column(Float, nullable=False, default=0.0) # 其他杂费
+    net_amount = Column(Float, nullable=False) # 净成交金额 (考虑费用后的实际金额)
     trade_time = Column(DateTime, nullable=False) # 实际成交时间
     created_at = Column(DateTime, default=datetime.now)
 
     def __repr__(self):
-        return f"<Trade(trade_id={self.trade_id}, stock_code={self.stock_code}, direction={self.direction}, quantity={self.quantity}, price={self.price})>"
+        return f"<Trade(trade_id={self.trade_id}, stock_code={self.stock_code}, direction={self.direction}, quantity={self.quantity}, price={self.price}, net_amount={self.net_amount})>"
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -112,6 +116,10 @@ class Trade(Base):
             'quantity': self.quantity,
             'price': self.price,
             'amount': self.amount,
+            'commission': self.commission,
+            'stamp_duty': self.stamp_duty,
+            'other_fees': self.other_fees,
+            'net_amount': self.net_amount,
             'trade_time': self.trade_time.isoformat() if self.trade_time else None,
             'created_at': self.created_at.isoformat() if self.created_at else None,
         }

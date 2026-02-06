@@ -114,6 +114,15 @@ class Config:
     trading_capital: float = 100000.0         # 交易账户初始资金 (模拟或实盘)
     trading_max_position_per_stock: float = 20000.0 # 单只股票的最大持仓金额
 
+    # === 实盘交易配置 (Real Trading Configs) ===
+    real_broker_type: Optional[str] = None # 实际经纪商类型，如 'guosen', 'htsc', 'tiger', 'ths_web'
+    real_broker_api_key: Optional[str] = None
+    real_broker_api_secret: Optional[str] = None # 在某些券商（如老虎证券）中，此字段可能用于存储RSA私钥文件路径或私钥内容
+    real_broker_account: Optional[str] = None # 交易账户名或ID
+    real_broker_password: Optional[str] = None # 交易账户密码 (敏感信息，需加密存储)
+    ui_automation_browser: str = "chrome" # UI自动化浏览器类型: chrome, firefox, edge, etc.
+    ui_automation_headless: bool = True # UI自动化是否无头模式运行
+    
     # === LLM Agent 配置 ===
     summarizer_model_name: str = "gemini-3-flash-preview" # 摘要 Agent 使用的模型
     summarizer_model_type: str = "gemini"     # 摘要 Agent 的模型类型 (gemini, openai, ollama)
@@ -227,6 +236,16 @@ class Config:
             trading_broker=os.getenv('TRADING_BROKER', 'paper'),
             trading_capital=float(os.getenv('TRADING_CAPITAL', '100000.0')),
             trading_max_position_per_stock=float(os.getenv('TRADING_MAX_POSITION_PER_STOCK', '20000.0')),
+
+            # === 实盘交易配置 (Real Trading Configs) ===
+            real_broker_type=os.getenv('REAL_BROKER_TYPE'),
+            real_broker_api_key=os.getenv('REAL_BROKER_API_KEY'),
+            real_broker_api_secret=os.getenv('REAL_BROKER_API_SECRET'),
+            real_broker_account=os.getenv('REAL_BROKER_ACCOUNT'),
+            real_broker_password=os.getenv('REAL_BROKER_PASSWORD'), # 敏感信息，需加密存储
+            ui_automation_browser=os.getenv('UI_AUTOMATION_BROWSER', 'chrome'),
+            ui_automation_headless=os.getenv('UI_AUTOMATION_HEADLESS', 'true').lower() == 'true',
+
 
             # === LLM Agent 配置 ===
             summarizer_model_name=os.getenv('SUMMARIZER_MODEL_NAME', 'gemini-3-flash-preview'),
