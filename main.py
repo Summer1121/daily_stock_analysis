@@ -57,6 +57,7 @@ from analysis.orchestrator import LLMOrchestrator
 from analysis.agents.decision import AnalysisResult # 直接从 decision 导入
 from analysis.utils import STOCK_NAME_MAP # 导入 STOCK_NAME_MAP
 
+LOG_FORMAT = '%(asctime)s [%(levelname)s] %(name)s: %(message)s'
 LOG_DATE_FORMAT = '%Y-%m-%d %H:%M:%S'
 
 
@@ -844,8 +845,8 @@ def run_full_analysis(
             # 只调用一次，并获取结果
             review_result = run_market_review(
                 notifier=pipeline.notifier,
-                analyzer=pipeline.analyzer,
-                search_service=pipeline.search_service
+                analyzer=pipeline.orchestrator.decision_agent,
+                search_service=pipeline.orchestrator.search_service
             )
             # 如果有结果，赋值给 market_report 用于后续飞书文档生成
             if review_result:
@@ -970,9 +971,9 @@ def main() -> int:
                     serpapi_keys=config.serpapi_keys
                 )
             
-            if config.gemini_api_key:
-                analyzer = GeminiAnalyzer(api_key=config.gemini_api_key)
-            
+            # 使用与主流程一致的 DecisionAgent（支持 Gemini / OpenAI 兼容 API）
+            from analysis.agents.decision import DecisionAgent
+            analyzer = DecisionAgent(config=config)
             run_market_review(notifier, analyzer, search_service)
             return 0
         

@@ -849,8 +849,8 @@ def render_config_page(
     // 提交分析
     window.submitAnalysis = function() {
         const code = codeInput.value.trim().toLowerCase();
-        const isAStock = /^\d{6}$/.test(code);
-        const isHKStock = /^hk\d{5}$/.test(code);
+        const isAStock = /^\\d{6}$/.test(code);
+        const isHKStock = /^hk\\d{5}$/.test(code);
         
         if (!(isAStock || isHKStock)) {
             return;
